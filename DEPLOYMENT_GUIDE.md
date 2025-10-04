@@ -1,647 +1,349 @@
-# Deployment Guide - Data Archival and Purging Admin Application
+# Branch Role Rotation System - Deployment Guide
 
-This guide provides detailed instructions for deploying the Data Archival and Purging Admin Application in various environments.
+This guide provides step-by-step instructions for deploying the Branch Role Rotation Management System, which consists of a Spring Boot backend with MySQL database and a Flutter mobile application.
 
-## 📋 Prerequisites
+## System Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Flutter App   │◄──►│  Spring Boot    │◄──►│   MySQL DB      │
+│   (Frontend)    │    │   (Backend)     │    │   (Database)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+## Prerequisites
 
 ### System Requirements
-- **CPU**: 2+ cores
-- **RAM**: 4GB+ (8GB recommended for production)
-- **Storage**: 20GB+ free space
-- **OS**: Linux (Ubuntu 20.04+), Windows 10+, or macOS 10.15+
+- **Java**: JDK 17 or higher
+- **MySQL**: Version 8.0 or higher
+- **Maven**: Version 3.6 or higher
+- **Flutter**: SDK 3.0 or higher
+- **Operating System**: Windows, macOS, or Linux
 
-### Software Requirements
-- **Java**: 17 or higher
-- **MySQL**: 8.0 or higher
-- **Maven**: 3.6 or higher
-- **Flutter**: 3.0 or higher (for frontend development)
-- **Git**: Latest version
+### Development Tools
+- **IDE**: IntelliJ IDEA, Eclipse, or VS Code
+- **Database Client**: MySQL Workbench or similar
+- **Mobile Device**: Android/iOS device or emulator
 
-## 🗄️ Database Setup
+## Backend Deployment
 
-### 1. MySQL Installation
+### 1. Database Setup
 
-#### Ubuntu/Debian
-```bash
-sudo apt update
-sudo apt install mysql-server
-sudo mysql_secure_installation
-```
-
-#### CentOS/RHEL
-```bash
-sudo yum install mysql-server
-sudo systemctl start mysqld
-sudo systemctl enable mysqld
-sudo mysql_secure_installation
-```
-
-#### Windows
-1. Download MySQL Installer from [mysql.com](https://dev.mysql.com/downloads/installer/)
-2. Run the installer and follow the setup wizard
-3. Configure root password and create a new user
-
-### 2. Database Creation
-
-```bash
-# Connect to MySQL
+#### Create MySQL Database
+```sql
+-- Connect to MySQL as root user
 mysql -u root -p
 
-# Create databases
-CREATE DATABASE data_archival_live;
-CREATE DATABASE data_archival_archive;
-
-# Create user for the application
-CREATE USER 'archival_user'@'localhost' IDENTIFIED BY 'secure_password';
-GRANT ALL PRIVILEGES ON data_archival_live.* TO 'archival_user'@'localhost';
-GRANT ALL PRIVILEGES ON data_archival_archive.* TO 'archival_user'@'localhost';
-FLUSH PRIVILEGES;
+-- Create database
+CREATE DATABASE branch_role_rotation;
+USE branch_role_rotation;
 ```
 
-### 3. Schema Setup
-
+#### Run Database Schema
 ```bash
-# Run the database scripts
-mysql -u root -p data_archival_live < database-scripts/01_create_live_database.sql
-mysql -u root -p data_archival_archive < database-scripts/02_create_archival_database.sql
+# Navigate to backend directory
+cd /workspace/branch-role-rotation-backend
+
+# Execute schema script
+mysql -u root -p branch_role_rotation < src/main/resources/schema.sql
 ```
 
-## 🚀 Backend Deployment
+#### Verify Database Setup
+```sql
+-- Check tables
+SHOW TABLES;
 
-### 1. Development Environment
-
-#### Clone Repository
-```bash
-git clone <repository-url>
-cd data-archival-backend
+-- Verify sample data
+SELECT * FROM users;
+SELECT * FROM job_roles;
+SELECT * FROM job_role_rotations;
 ```
 
-#### Configure Application
+### 2. Backend Configuration
+
+#### Update Application Properties
 Edit `src/main/resources/application.yml`:
+
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/data_archival_live?useSSL=false&serverTimezone=IST&allowPublicKeyRetrieval=true
-    username: archival_user
-    password: secure_password
-
-archival:
-  datasource:
-    url: jdbc:mysql://localhost:3306/data_archival_archive?useSSL=false&serverTimezone=IST&allowPublicKeyRetrieval=true
-    username: archival_user
-    password: secure_password
+    url: jdbc:mysql://localhost:3306/branch_role_rotation?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: your_mysql_username
+    password: your_mysql_password
 ```
 
-#### Build and Run
+#### Configure JWT Secret
+Update the JWT secret in `application.yml`:
+```yaml
+spring:
+  security:
+    jwt:
+      secret: your_secure_jwt_secret_key_here
+      expiration: 86400000 # 24 hours
+```
+
+### 3. Build and Run Backend
+
+#### Build Application
 ```bash
-mvn clean install
-mvn spring-boot:run
-```
-
-### 2. Production Environment
-
-#### Build JAR File
-```bash
-mvn clean package -DskipTests
-```
-
-#### Create Application Directory
-```bash
-sudo mkdir -p /opt/data-archival
-sudo cp target/data-archival-purging-1.0.0.jar /opt/data-archival/
-sudo chown -R $USER:$USER /opt/data-archival
-```
-
-#### Create Systemd Service
-Create `/etc/systemd/system/data-archival.service`:
-```ini
-[Unit]
-Description=Data Archival and Purging Application
-After=mysql.service
-
-[Service]
-Type=simple
-User=archival
-Group=archival
-WorkingDirectory=/opt/data-archival
-ExecStart=/usr/bin/java -jar data-archival-purging-1.0.0.jar
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-#### Create Application User
-```bash
-sudo useradd -r -s /bin/false archival
-sudo chown -R archival:archival /opt/data-archival
-```
-
-#### Start Service
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable data-archival
-sudo systemctl start data-archival
-sudo systemctl status data-archival
-```
-
-### 3. Docker Deployment
-
-#### Create Dockerfile
-```dockerfile
-FROM openjdk:17-jdk-slim
-
-WORKDIR /app
-
-COPY target/data-archival-purging-1.0.0.jar app.jar
-
-EXPOSE 8080
-
-ENTRYPOINT ["java", "-jar", "app.jar"]
-```
-
-#### Build and Run
-```bash
-docker build -t data-archival-backend .
-docker run -d \
-  --name data-archival-backend \
-  -p 8080:8080 \
-  -e DB_USERNAME=archival_user \
-  -e DB_PASSWORD=secure_password \
-  -e ARCHIVAL_DB_USERNAME=archival_user \
-  -e ARCHIVAL_DB_PASSWORD=secure_password \
-  data-archival-backend
-```
-
-## 🎨 Frontend Deployment
-
-### 1. Development Environment
-
-#### Setup Flutter
-```bash
-# Install Flutter (if not already installed)
-# Follow instructions at https://flutter.dev/docs/get-started/install
-
-cd flutter-admin-app
-flutter pub get
-```
-
-#### Configure API URL
-Edit `lib/services/api_service.dart`:
-```dart
-static const String baseUrl = 'http://localhost:8080/api';
+cd /workspace/branch-role-rotation-backend
+mvn clean compile
+mvn package
 ```
 
 #### Run Application
 ```bash
-# For Web
-flutter run -d chrome
+# Option 1: Using Maven
+mvn spring-boot:run
 
-# For Mobile
+# Option 2: Using JAR file
+java -jar target/branch-role-rotation-backend-0.0.1-SNAPSHOT.jar
+```
+
+#### Verify Backend is Running
+```bash
+# Test health endpoint
+curl http://localhost:8080/api/auth/login
+
+# Expected response: Method not allowed (405) - this confirms server is running
+```
+
+### 4. Backend Testing
+
+#### Test Authentication
+```bash
+# Test login endpoint
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"bm001","password":"password"}'
+```
+
+#### Test Job Role Endpoints
+```bash
+# Get token from login response, then test protected endpoint
+curl -X GET http://localhost:8080/api/job-role-rotation/my-history \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+## Frontend Deployment
+
+### 1. Flutter Setup
+
+#### Install Flutter Dependencies
+```bash
+cd /workspace/branch-role-rotation-flutter
+flutter pub get
+```
+
+#### Update API Configuration
+Edit `lib/utils/app_constants.dart`:
+```dart
+// Update base URL if backend is not running on localhost
+static const String baseUrl = 'http://YOUR_BACKEND_IP:8080/api';
+```
+
+### 2. Run Flutter Application
+
+#### For Android
+```bash
+# Check connected devices
+flutter devices
+
+# Run on Android device/emulator
 flutter run
-
-# For Desktop
-flutter run -d windows
 ```
 
-### 2. Production Web Deployment
-
-#### Build for Web
+#### For iOS (macOS only)
 ```bash
-flutter build web --release
+# Run on iOS simulator
+flutter run -d ios
 ```
 
-#### Deploy to Web Server
-
-##### Apache Configuration
-Create `/etc/apache2/sites-available/data-archival.conf`:
-```apache
-<VirtualHost *:80>
-    ServerName your-domain.com
-    DocumentRoot /var/www/data-archival
-    
-    <Directory /var/www/data-archival>
-        AllowOverride All
-        Require all granted
-    </Directory>
-    
-    # Proxy API requests to backend
-    ProxyPreserveHost On
-    ProxyPass /api/ http://localhost:8080/api/
-    ProxyPassReverse /api/ http://localhost:8080/api/
-</VirtualHost>
-```
-
-Enable the site:
+#### For Web
 ```bash
-sudo a2ensite data-archival
-sudo systemctl reload apache2
+# Enable web support
+flutter config --enable-web
+
+# Run on web
+flutter run -d web-server --web-port 3000
 ```
 
-##### Nginx Configuration
-Create `/etc/nginx/sites-available/data-archival`:
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    root /var/www/data-archival;
-    index index.html;
+### 3. Flutter Testing
 
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
+#### Test Authentication Flow
+1. Launch the app
+2. Use demo credentials:
+   - **BM**: `bm001` / `password`
+   - **BDO**: `bdo001` / `password`
+   - **CSE**: `cse001` / `password`
+3. Verify login success and navigation to home screen
 
-    location /api/ {
-        proxy_pass http://localhost:8080/api/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
+#### Test Role-Based Views
+1. **BM User**: Should see all three tabs (My Role, Team, Branch)
+2. **BDO/CSE User**: Should see personal role information
+3. Test "As on Date" functionality
+4. Test data refresh functionality
 
-Enable the site:
-```bash
-sudo ln -s /etc/nginx/sites-available/data-archival /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
+## Production Deployment
 
-### 3. Mobile App Deployment
+### 1. Backend Production Setup
 
-#### Android
-```bash
-flutter build apk --release
-# APK will be in build/app/outputs/flutter-apk/
-```
-
-#### iOS
-```bash
-flutter build ios --release
-# Follow Xcode deployment process
-```
-
-## 🔧 Configuration Management
-
-### 1. Environment Variables
-
-Create `.env` file:
-```bash
-# Database Configuration
-DB_USERNAME=archival_user
-DB_PASSWORD=secure_password
-ARCHIVAL_DB_USERNAME=archival_user
-ARCHIVAL_DB_PASSWORD=secure_password
-
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key
-
-# Application Configuration
-SERVER_PORT=8080
-LOG_LEVEL=INFO
-```
-
-### 2. Application Properties
-
-Update `application.yml` for production:
+#### Environment Configuration
+Create `application-prod.yml`:
 ```yaml
-server:
-  port: ${SERVER_PORT:8080}
-
 spring:
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/data_archival_live
+    url: jdbc:mysql://prod-db-host:3306/branch_role_rotation
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
-    
-archival:
-  datasource:
-    url: jdbc:mysql://${ARCHIVAL_DB_HOST:localhost}:${ARCHIVAL_DB_PORT:3306}/data_archival_archive
-    username: ${ARCHIVAL_DB_USERNAME}
-    password: ${ARCHIVAL_DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
 
 logging:
   level:
-    com.dataarchival: ${LOG_LEVEL:INFO}
+    com.branch.rotation: INFO
+    org.springframework.security: WARN
 ```
 
-## 📊 Monitoring Setup
-
-### 1. Application Monitoring
-
-#### Enable Actuator Endpoints
-The application includes Spring Boot Actuator for monitoring:
-- Health: `http://localhost:8080/api/actuator/health`
-- Metrics: `http://localhost:8080/api/actuator/metrics`
-- Info: `http://localhost:8080/api/actuator/info`
-
-#### Log Monitoring
+#### Build Production JAR
 ```bash
-# View logs
-tail -f logs/data-archival.log
-
-# Monitor errors
-grep -i error logs/data-archival.log | tail -20
-
-# Monitor job executions
-grep -i "job execution" logs/data-archival.log | tail -20
+mvn clean package -Pprod
 ```
 
-### 2. Database Monitoring
+#### Deploy to Server
+```bash
+# Copy JAR to production server
+scp target/branch-role-rotation-backend-0.0.1-SNAPSHOT.jar user@prod-server:/app/
 
-#### MySQL Monitoring
+# Run on production server
+java -jar -Dspring.profiles.active=prod /app/branch-role-rotation-backend-0.0.1-SNAPSHOT.jar
+```
+
+### 2. Frontend Production Build
+
+#### Android APK
+```bash
+flutter build apk --release
+# Output: build/app/outputs/flutter-apk/app-release.apk
+```
+
+#### iOS IPA (macOS only)
+```bash
+flutter build ios --release
+# Follow Xcode instructions for App Store deployment
+```
+
+#### Web Build
+```bash
+flutter build web --release
+# Output: build/web/
+```
+
+### 3. Database Production Setup
+
+#### Production Database Configuration
 ```sql
--- Check database size
-SELECT 
-    table_schema AS 'Database',
-    ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'Size (MB)'
-FROM information_schema.tables
-WHERE table_schema IN ('data_archival_live', 'data_archival_archive')
-GROUP BY table_schema;
+-- Create production database
+CREATE DATABASE branch_role_rotation_prod;
 
--- Check job execution status
-SELECT 
-    table_name,
-    job_type,
-    status,
-    COUNT(*) as count
-FROM job_execution_history
-GROUP BY table_name, job_type, status;
-```
-
-### 3. System Monitoring
-
-#### Resource Usage
-```bash
-# Check memory usage
-free -h
-
-# Check disk usage
-df -h
-
-# Check CPU usage
-top -p $(pgrep java)
-```
-
-## 🔒 Security Configuration
-
-### 1. Database Security
-
-#### Secure MySQL Installation
-```bash
-# Run security script
-sudo mysql_secure_installation
-
-# Create application user with limited privileges
-CREATE USER 'archival_user'@'localhost' IDENTIFIED BY 'strong_password';
-GRANT SELECT, INSERT, UPDATE, DELETE ON data_archival_live.* TO 'archival_user'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON data_archival_archive.* TO 'archival_user'@'localhost';
+-- Create production user
+CREATE USER 'branch_app'@'%' IDENTIFIED BY 'secure_password';
+GRANT ALL PRIVILEGES ON branch_role_rotation_prod.* TO 'branch_app'@'%';
 FLUSH PRIVILEGES;
 ```
 
-### 2. Application Security
-
-#### Enable HTTPS
-```yaml
-server:
-  port: 8443
-  ssl:
-    enabled: true
-    key-store: classpath:keystore.p12
-    key-store-password: your_password
-    key-store-type: PKCS12
-```
-
-#### Configure CORS
-```java
-@Configuration
-public class SecurityConfig {
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList("https://your-domain.com"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setAllowCredentials(true);
-        return source;
-    }
-}
-```
-
-### 3. Network Security
-
-#### Firewall Configuration
+#### Run Production Schema
 ```bash
-# Allow only necessary ports
-sudo ufw allow 22    # SSH
-sudo ufw allow 80    # HTTP
-sudo ufw allow 443   # HTTPS
-sudo ufw allow 3306  # MySQL (if external access needed)
-sudo ufw enable
+mysql -u branch_app -p branch_role_rotation_prod < src/main/resources/schema.sql
 ```
 
-## 🚨 Troubleshooting
+## Security Considerations
+
+### 1. Database Security
+- Use strong passwords for database users
+- Enable SSL connections in production
+- Regular database backups
+- Access control and user permissions
+
+### 2. Application Security
+- Use strong JWT secrets (minimum 256 bits)
+- Enable HTTPS in production
+- Implement rate limiting
+- Regular security updates
+
+### 3. Mobile App Security
+- Certificate pinning for API calls
+- Secure token storage
+- Code obfuscation for production builds
+- Regular security audits
+
+## Monitoring and Maintenance
+
+### 1. Application Monitoring
+- Set up application logs
+- Monitor API response times
+- Track user authentication failures
+- Database performance monitoring
+
+### 2. Regular Maintenance
+- Database backup and recovery procedures
+- Application updates and patches
+- Security vulnerability assessments
+- Performance optimization
+
+## Troubleshooting
 
 ### Common Issues
 
-#### 1. Database Connection Issues
-```bash
-# Check MySQL status
-sudo systemctl status mysql
+#### Backend Issues
+1. **Database Connection Failed**
+   - Check MySQL service status
+   - Verify connection credentials
+   - Ensure database exists
 
-# Test connection
-mysql -u archival_user -p -h localhost
+2. **JWT Token Issues**
+   - Verify JWT secret configuration
+   - Check token expiration settings
+   - Validate token format
 
-# Check logs
-sudo tail -f /var/log/mysql/error.log
-```
+#### Frontend Issues
+1. **API Connection Failed**
+   - Verify backend is running
+   - Check network connectivity
+   - Update API base URL
 
-#### 2. Application Startup Issues
-```bash
-# Check application logs
-tail -f logs/data-archival.log
+2. **Authentication Issues**
+   - Clear app data/cache
+   - Verify credentials
+   - Check token storage
 
-# Check systemd service
-sudo systemctl status data-archival
-sudo journalctl -u data-archival -f
-```
+### Log Analysis
+- Backend logs: Check application logs for errors
+- Database logs: Monitor MySQL error logs
+- Mobile logs: Use Flutter debugging tools
 
-#### 3. Frontend Issues
-```bash
-# Check Flutter doctor
-flutter doctor
+## Support and Documentation
 
-# Clean and rebuild
-flutter clean
-flutter pub get
-flutter build web --release
-```
+### API Documentation
+- Swagger UI available at: `http://localhost:8080/swagger-ui.html`
+- API endpoints documented in controller classes
 
-### Performance Issues
+### Code Documentation
+- JavaDoc comments in backend code
+- Dart documentation in Flutter code
+- README files in each module
 
-#### 1. Database Performance
-```sql
--- Check slow queries
-SHOW VARIABLES LIKE 'slow_query_log';
-SHOW VARIABLES LIKE 'long_query_time';
+### Contact Information
+For technical support or questions about the Branch Role Rotation system, please refer to the project documentation or contact the development team.
 
--- Optimize tables
-OPTIMIZE TABLE table_config;
-OPTIMIZE TABLE job_execution_history;
-```
+## Conclusion
 
-#### 2. Application Performance
-```bash
-# Monitor JVM memory
-jstat -gc $(pgrep java) 5s
+The Branch Role Rotation Management System is now ready for deployment. Follow this guide step-by-step to ensure a successful deployment in both development and production environments.
 
-# Check thread dumps
-jstack $(pgrep java) > thread_dump.txt
-```
-
-## 📈 Scaling
-
-### 1. Horizontal Scaling
-
-#### Load Balancer Configuration
-```nginx
-upstream data_archival_backend {
-    server backend1:8080;
-    server backend2:8080;
-    server backend3:8080;
-}
-
-server {
-    location /api/ {
-        proxy_pass http://data_archival_backend;
-    }
-}
-```
-
-#### Database Clustering
-- Set up MySQL Master-Slave replication
-- Configure read replicas for reporting
-- Implement database sharding if needed
-
-### 2. Vertical Scaling
-
-#### JVM Tuning
-```bash
-java -Xms2g -Xmx4g -XX:+UseG1GC -jar data-archival-purging-1.0.0.jar
-```
-
-#### Database Tuning
-```sql
--- Increase buffer pool size
-SET GLOBAL innodb_buffer_pool_size = 2G;
-
--- Optimize query cache
-SET GLOBAL query_cache_size = 256M;
-```
-
-## 🔄 Backup and Recovery
-
-### 1. Database Backup
-
-#### Automated Backup Script
-```bash
-#!/bin/bash
-# backup.sh
-
-DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="/opt/backups"
-DB_NAME="data_archival_live"
-ARCHIVAL_DB_NAME="data_archival_archive"
-
-# Create backup directory
-mkdir -p $BACKUP_DIR
-
-# Backup live database
-mysqldump -u root -p $DB_NAME > $BACKUP_DIR/${DB_NAME}_${DATE}.sql
-
-# Backup archival database
-mysqldump -u root -p $ARCHIVAL_DB_NAME > $BACKUP_DIR/${ARCHIVAL_DB_NAME}_${DATE}.sql
-
-# Compress backups
-gzip $BACKUP_DIR/${DB_NAME}_${DATE}.sql
-gzip $BACKUP_DIR/${ARCHIVAL_DB_NAME}_${DATE}.sql
-
-# Keep only last 7 days of backups
-find $BACKUP_DIR -name "*.sql.gz" -mtime +7 -delete
-```
-
-#### Schedule Backup
-```bash
-# Add to crontab
-0 2 * * * /opt/scripts/backup.sh
-```
-
-### 2. Application Backup
-
-#### Configuration Backup
-```bash
-# Backup configuration files
-tar -czf config_backup_$(date +%Y%m%d).tar.gz \
-    /opt/data-archival/application.yml \
-    /etc/systemd/system/data-archival.service
-```
-
-## 📋 Maintenance
-
-### 1. Regular Maintenance Tasks
-
-#### Weekly Tasks
-- Check application logs for errors
-- Monitor database performance
-- Review job execution history
-- Update security patches
-
-#### Monthly Tasks
-- Analyze system metrics
-- Optimize database tables
-- Review and rotate logs
-- Update documentation
-
-#### Quarterly Tasks
-- Security audit
-- Performance review
-- Capacity planning
-- Disaster recovery testing
-
-### 2. Log Management
-
-#### Log Rotation
-```bash
-# Configure logrotate
-sudo vim /etc/logrotate.d/data-archival
-
-# Content:
-/opt/data-archival/logs/*.log {
-    daily
-    missingok
-    rotate 30
-    compress
-    delaycompress
-    notifempty
-    create 644 archival archival
-}
-```
-
-## 🎯 Production Checklist
-
-- [ ] Database setup and configuration
-- [ ] Application deployment
-- [ ] Frontend deployment
-- [ ] Security configuration
-- [ ] Monitoring setup
-- [ ] Backup configuration
-- [ ] Load testing
-- [ ] Documentation review
-- [ ] Team training
-- [ ] Go-live plan
-
----
-
-**Note**: This deployment guide provides a comprehensive overview. Always test in a development environment before deploying to production. Consider your specific requirements and adjust configurations accordingly.
+Remember to:
+- Test thoroughly in development before production deployment
+- Maintain regular backups of the database
+- Monitor system performance and security
+- Keep all components updated with latest security patches
