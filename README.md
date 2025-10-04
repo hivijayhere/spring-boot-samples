@@ -1,388 +1,178 @@
-# Data Archival and Purging Admin Application
-
-A comprehensive admin application for managing data archival and purging operations across transaction tables in a live database. The system provides configurable scheduling, monitoring, and metrics for data lifecycle management.
-
-## 🏗️ Architecture
-
-- **Frontend**: Flutter (Cross-platform mobile/web admin interface)
-- **Backend**: Java Spring Boot (RESTful APIs and business logic)
-- **Database**: MySQL (Live DB, Archival DB, Configuration DB)
-- **Scheduling**: Spring Boot Scheduler with Quartz
-- **Time Zone**: IST (Indian Standard Time)
-
-## 🚀 Features
-
-- ✅ Configurable archival and purge days per table
-- ✅ Automated scheduling at 12:00 AM IST
-- ✅ Real-time job status monitoring
-- ✅ Comprehensive metrics and reporting
-- ✅ Admin dashboard for configuration management
-- ✅ Data integrity validation
-- ✅ Rollback capabilities (planned)
-- ✅ RESTful API endpoints
-- ✅ Responsive Flutter admin interface
-
-## 📋 Prerequisites
-
-- Java 17 or higher
-- MySQL 8.0 or higher
-- Flutter 3.0 or higher
-- Maven 3.6 or higher
-
-## 🛠️ Installation & Setup
-
-### 1. Database Setup
-
-#### Create Live Database
-```bash
-mysql -u root -p < database-scripts/01_create_live_database.sql
-```
-
-#### Create Archival Database
-```bash
-mysql -u root -p < database-scripts/02_create_archival_database.sql
-```
-
-### 2. Backend Setup
-
-#### Navigate to Backend Directory
-```bash
-cd data-archival-backend
-```
-
-#### Update Database Configuration
-Edit `src/main/resources/application.yml`:
-```yaml
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/data_archival_live?useSSL=false&serverTimezone=IST&allowPublicKeyRetrieval=true
-    username: your_username
-    password: your_password
-
-archival:
-  datasource:
-    url: jdbc:mysql://localhost:3306/data_archival_archive?useSSL=false&serverTimezone=IST&allowPublicKeyRetrieval=true
-    username: your_username
-    password: your_password
-```
-
-#### Build and Run
-```bash
-mvn clean install
-mvn spring-boot:run
-```
-
-The backend will be available at `http://localhost:8080`
-
-### 3. Frontend Setup
-
-#### Navigate to Flutter App Directory
-```bash
-cd flutter-admin-app
-```
-
-#### Install Dependencies
-```bash
-flutter pub get
-```
-
-#### Update API Base URL
-Edit `lib/services/api_service.dart`:
-```dart
-static const String baseUrl = 'http://your-backend-url:8080/api';
-```
-
-#### Run the Application
-```bash
-# For Web
-flutter run -d chrome
-
-# For Mobile
-flutter run
-
-# For Desktop
-flutter run -d windows
-```
-
-## 📚 API Documentation
-
-### Configuration Management APIs
-
-#### Get All Table Configurations
-```http
-GET /api/v1/config/tables
-```
-
-#### Create Table Configuration
-```http
-POST /api/v1/config/tables
-Content-Type: application/json
+# Branch Role Rotation Management System
+
+A comprehensive mobile application system for managing branch-level job role rotations within banking organizations. This system consists of a Spring Boot backend with MySQL database and a Flutter mobile frontend.
+
+## System Overview
+
+The Branch Role Rotation system is designed specifically for branch-level roles (BDO, CSE, and BM) and provides:
+
+- **Complete Role History**: Maintains full history of job role rotations per user
+- **Branch-Level Focus**: Only displays role data for branch business roles
+- **BM-Level Views**: Specialized views for Branch Managers
+- **As on Date Functionality**: View role data for specific historical dates
+- **Real-time Updates**: PJMCL handles job role updates captured in the Job Role Rotation table
+
+## Architecture
+
+### Backend (Spring Boot + MySQL)
+- **Location**: `/branch-role-rotation-backend/`
+- **Technology Stack**: Spring Boot 3.2.0, Spring Security, JPA/Hibernate, MySQL 8.0
+- **Authentication**: JWT-based authentication
+- **API**: RESTful APIs with comprehensive error handling
+
+### Frontend (Flutter)
+- **Location**: `/branch-role-rotation-flutter/`
+- **Technology Stack**: Flutter 3.0+, Provider state management
+- **UI**: Material Design with responsive layouts
+- **Features**: Role-based views, date picker, real-time data refresh
+
+## Key Features
+
+### 1. Role-Based Access
+- **Branch Manager (BM)**: Full access to own role history and team member roles
+- **Branch Development Officer (BDO)**: Access to own role history
+- **Customer Service Executive (CSE)**: Access to own role history
+
+### 2. BM-Level View Components
+- **My Job Role Details**: Shows BM's own job role rotation history and current role
+- **My Team Job Role Details**: Displays job role rotation history for team members (BDO/CSE) under the BM
+
+### 3. As on Date Widget
+- Date picker functionality to view role data for specific historical dates
+- Maintains complete historical records
+- Only displays data if historical records exist in the table
+
+### 4. Data Management
+- Complete history of job roles per user
+- Branch repository changes while maintaining common base roles
+- PJMCL-managed job role updates
+- No roll-up or visibility for non-branch business unit users
+
+## Database Schema
+
+### Core Tables
+1. **users**: User information and branch details
+2. **job_roles**: Available job roles (BDO, CSE, BM)
+3. **job_role_rotations**: Complete history of role rotations
+
+### Key Relationships
+- Users belong to branches
+- Job role rotations link users to roles with effective dates
+- Historical data maintained with complete audit trail
+
+## API Endpoints
+
+### Authentication
+- `POST /api/auth/login` - User login
+- `POST /api/auth/validate` - Token validation
+
+### Job Role Management
+- `GET /api/job-role-rotation/my-history` - Personal job role history
+- `GET /api/job-role-rotation/my-history/as-on-date` - History for specific date
+- `GET /api/job-role-rotation/my-current-role` - Current active role
+- `GET /api/job-role-rotation/bm-view` - BM-level comprehensive view
+- `GET /api/job-role-rotation/team-history` - Team member role history
+- `GET /api/job-role-rotation/branch-history` - Complete branch role history
+
+## Setup Instructions
+
+### Prerequisites
+- Java 17+
+- MySQL 8.0+
+- Flutter SDK 3.0+
+- Maven 3.6+
+
+### Backend Setup
+1. Navigate to `/branch-role-rotation-backend/`
+2. Update `application.yml` with your MySQL credentials
+3. Run the SQL schema script to create database and tables
+4. Execute: `mvn spring-boot:run`
+5. Backend will be available at `http://localhost:8080`
+
+### Frontend Setup
+1. Navigate to `/branch-role-rotation-flutter/`
+2. Run: `flutter pub get`
+3. Update API base URL in `lib/utils/app_constants.dart` if needed
+4. Run: `flutter run`
+
+### Database Setup
+1. Create MySQL database: `branch_role_rotation`
+2. Run the schema script to create tables and insert sample data
+3. Default credentials are included in the schema
 
-{
-  "tableName": "sample_transactions",
-  "archivalDays": 30,
-  "purgeDays": 365,
-  "isActive": true
-}
-```
+## Demo Credentials
 
-#### Update Table Configuration
-```http
-PUT /api/v1/config/tables/{id}
-Content-Type: application/json
+- **Branch Manager**: Username: `bm001`, Password: `password`
+- **Branch Development Officer**: Username: `bdo001`, Password: `password`
+- **Customer Service Executive**: Username: `cse001`, Password: `password`
 
-{
-  "tableName": "sample_transactions",
-  "archivalDays": 45,
-  "purgeDays": 400,
-  "isActive": true
-}
-```
+## Security Features
 
-#### Delete Table Configuration
-```http
-DELETE /api/v1/config/tables/{id}
-```
-
-### Job Management APIs
+- JWT token-based authentication
+- Password encryption with BCrypt
+- Role-based access control
+- Secure API endpoints
+- Token validation and refresh
 
-#### Get Job Status
-```http
-GET /api/v1/jobs/status
-```
+## Mobile App Features
 
-#### Get Job History
-```http
-GET /api/v1/jobs/history?tableName={name}&page=0&size=10
-```
-
-#### Get Job Statistics
-```http
-GET /api/v1/jobs/stats
-```
-
-### Data Management APIs
+### Screens
+1. **Splash Screen**: App initialization and authentication check
+2. **Login Screen**: Secure authentication with demo credentials
+3. **Home Screen**: Tabbed interface with role-specific views
 
-#### Trigger Archival Job
-```http
-POST /api/v1/data/trigger/archive?tableName={tableName}
-```
-
-#### Trigger Purge Job
-```http
-POST /api/v1/data/trigger/purge?tableName={tableName}
-```
-
-#### Preview Archival Data
-```http
-GET /api/v1/data/preview/archive?tableName={tableName}&days={days}
-```
-
-#### Preview Purge Data
-```http
-GET /api/v1/data/preview/purge?tableName={tableName}&days={days}
-```
-
-## 🎯 Usage Guide
-
-### 1. Configure Tables
+### Widgets
+- **DatePickerWidget**: As on Date functionality
+- **JobRoleCard**: Role information display with badges
+- **BMViewWidget**: Specialized Branch Manager view
 
-1. Open the Flutter admin application
-2. Navigate to "Table Configuration"
-3. Click "Add Configuration"
-4. Enter table name, archival days, and purge days
-5. Save the configuration
+### State Management
+- Provider pattern for state management
+- API service layer for backend communication
+- Local storage for authentication tokens
+- Error handling and user feedback
 
-### 2. Monitor Jobs
+## Business Rules
 
-1. Navigate to "Job Monitoring"
-2. View running jobs and their status
-3. Check job history for completed/failed jobs
-4. View detailed error messages for failed jobs
+1. **Branch-Level Only**: System is applicable only for branch-level roles (BDO, CSE, BM)
+2. **Historical Data**: Only display role data if historical records exist
+3. **PJMCL Management**: PJMCL handles job role updates
+4. **Complete History**: Maintain complete history of job roles per user
+5. **Branch Repository**: Branch repository may change, but base role remains common
+6. **No Roll-up**: No roll-up or visibility for non-branch business unit users
 
-### 3. View Metrics
+## Testing
 
-1. Navigate to "Metrics & Analytics"
-2. View system overview and data processing metrics
-3. Analyze job status distribution
-4. Monitor data processing volumes
+### Backend Testing
+- Unit tests for services and repositories
+- Integration tests for API endpoints
+- Security tests for authentication
 
-### 4. Manual Job Execution
+### Frontend Testing
+- Widget tests for UI components
+- Integration tests for API communication
+- User flow testing for different roles
 
-1. Navigate to "Job Monitoring"
-2. Use the trigger buttons to manually start archival or purge jobs
-3. Monitor job progress in real-time
-
-## 🔧 Configuration
+## Deployment
 
-### Scheduler Configuration
+### Backend Deployment
+- Spring Boot JAR deployment
+- MySQL database configuration
+- Environment-specific configuration
 
-The scheduler runs automatically at 12:00 AM IST. To modify the schedule, update the cron expression in `application.yml`:
+### Frontend Deployment
+- Flutter APK/IPA generation
+- App store deployment
+- Configuration for production API endpoints
 
-```yaml
-scheduler:
-  cron:
-    archival: "0 0 0 * * ?"  # 12:00 AM IST daily
-```
+## Future Enhancements
 
-### Database Configuration
+- Push notifications for role changes
+- Offline data synchronization
+- Advanced reporting and analytics
+- Role change approval workflows
+- Integration with HR systems
 
-Configure both live and archival databases in `application.yml`:
+## Support
 
-```yaml
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/data_archival_live
-    username: your_username
-    password: your_password
-
-archival:
-  datasource:
-    url: jdbc:mysql://localhost:3306/data_archival_archive
-    username: your_username
-    password: your_password
-```
-
-## 📊 Monitoring & Logs
-
-### Application Logs
-- Location: `logs/data-archival.log`
-- Level: DEBUG (configurable)
-- Rotation: Daily
-
-### Health Checks
-- Health endpoint: `http://localhost:8080/api/actuator/health`
-- Metrics endpoint: `http://localhost:8080/api/actuator/metrics`
-
-### Database Monitoring
-- Monitor job execution history table
-- Check system metrics table
-- Review error messages in job execution history
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-#### 1. Database Connection Issues
-- Verify MySQL is running
-- Check database credentials
-- Ensure databases exist
-
-#### 2. Scheduler Not Running
-- Check application logs
-- Verify timezone configuration
-- Ensure Quartz tables are created
-
-#### 3. Flutter App Not Connecting
-- Verify backend is running
-- Check API base URL configuration
-- Ensure CORS is enabled
-
-#### 4. Job Failures
-- Check error messages in job execution history
-- Verify table permissions
-- Ensure archival database is accessible
-
-### Log Analysis
-
-```bash
-# View application logs
-tail -f logs/data-archival.log
-
-# Search for errors
-grep -i error logs/data-archival.log
-
-# Search for job executions
-grep -i "job execution" logs/data-archival.log
-```
-
-## 🔒 Security Considerations
-
-- JWT-based authentication (implemented)
-- Role-based access control (planned)
-- API rate limiting (planned)
-- Input validation and sanitization
-- Database encryption at rest (recommended)
-- Secure API communication (HTTPS recommended)
-
-## 📈 Performance Optimization
-
-- Database connection pooling
-- Batch processing for large datasets
-- Configurable batch sizes
-- Index optimization
-- Query optimization
-
-## 🚀 Deployment
-
-### Production Deployment
-
-1. **Database Setup**
-   - Set up MySQL cluster
-   - Configure replication
-   - Set up monitoring
-
-2. **Backend Deployment**
-   - Build JAR file: `mvn clean package`
-   - Deploy to application server
-   - Configure load balancer
-   - Set up monitoring
-
-3. **Frontend Deployment**
-   - Build for production: `flutter build web`
-   - Deploy to web server
-   - Configure CDN (optional)
-
-### Docker Deployment (Optional)
-
-```dockerfile
-# Backend Dockerfile
-FROM openjdk:17-jdk-slim
-COPY target/data-archival-purging-1.0.0.jar app.jar
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 📞 Support
-
-For support and questions:
-- Create an issue in the repository
-- Check the troubleshooting section
-- Review the API documentation
-
-## 🔮 Future Enhancements
-
-- Machine learning-based retention policies
-- Automated data classification
-- Cross-database archival
-- Cloud storage integration
-- Microservices architecture
-- Message queue integration
-- Distributed processing
-- Auto-scaling capabilities
-
-## 📋 Changelog
-
-### Version 1.0.0
-- Initial release
-- Basic archival and purging functionality
-- Flutter admin interface
-- RESTful API endpoints
-- Automated scheduling
-- Metrics and monitoring
-
----
-
-**Note**: This application is designed for production use with proper security measures and monitoring in place. Always test in a development environment before deploying to production.
+For technical support or questions about the Branch Role Rotation system, please refer to the individual README files in the backend and frontend directories.
